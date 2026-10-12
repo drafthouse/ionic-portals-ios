@@ -4,6 +4,9 @@ import UIKit
 import Capacitor
 import IonicLiveUpdates
 import SwiftUI
+import os.signpost
+
+private let portalsSignposter = OSSignposter(subsystem: "io.ionic.portals", category: "PortalTiming")
 
 /// A UIKit UIView to display ``Portal`` content
 @objc(IONPortalUIView)
@@ -20,14 +23,18 @@ public class PortalUIView: UIView {
     private lazy var delegationHandler = WebViewDelegationHandler()
 
     @objc
-    public private(set) lazy var bridge = CapacitorBridge(
-        with: configuration,
-        delegate: self,
-        cordovaConfiguration: configDescriptor.cordovaConfiguration,
-        assetHandler: assetHandler,
-        delegationHandler: delegationHandler,
-        autoRegisterPlugins: false
-    )
+    public private(set) lazy var bridge: CapacitorBridge = {
+        let state = portalsSignposter.beginInterval("bridgeCreate", id: portalsSignposter.makeSignpostID())
+        defer { portalsSignposter.endInterval("bridgeCreate", state) }
+        return CapacitorBridge(
+            with: configuration,
+            delegate: self,
+            cordovaConfiguration: configDescriptor.cordovaConfiguration,
+            assetHandler: assetHandler,
+            delegationHandler: delegationHandler,
+            autoRegisterPlugins: false
+        )
+    }()
 
     private lazy var assetHandler: WebViewAssetHandler = {
         let handler = WebViewAssetHandler(router: router)
@@ -74,13 +81,18 @@ public class PortalUIView: UIView {
             return
         }
 
-        initView()
+        // The view was already added in `init`; adding it again re-resolved live updates
+        // and re-pinned the web view.
+        let pluginsState = portalsSignposter.beginInterval("registerPlugins", id: portalsSignposter.makeSignpostID())
         registerPlugins()
+        portalsSignposter.endInterval("registerPlugins", pluginsState)
 
         let url = bridge.config.appStartServerURL
         CAPLog.print("⚡️  Loading app at \(url.absoluteString)")
         bridge.webViewDelegationHandler.willLoadWebview(webView)
+        let loadState = portalsSignposter.beginInterval("webView.load", id: portalsSignposter.makeSignpostID())
         _ = webView.load(URLRequest(url: url))
+        portalsSignposter.endInterval("webView.load", loadState)
     }
 
     private func initView () {
@@ -117,6 +129,8 @@ public class PortalUIView: UIView {
     }
 
     private func createWebView(with configuration: InstanceConfiguration, assetHandler: WebViewAssetHandler, delegationHandler: WebViewDelegationHandler) -> WKWebView {
+        let state = portalsSignposter.beginInterval("createWebView", id: portalsSignposter.makeSignpostID())
+        defer { portalsSignposter.endInterval("createWebView", state) }
         // set the cookie policy
         HTTPCookieStorage.shared.cookieAcceptPolicy = HTTPCookie.AcceptPolicy.always
         // setup the web view configuration
