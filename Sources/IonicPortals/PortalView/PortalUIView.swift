@@ -51,6 +51,9 @@ public class PortalUIView: UIView {
     #endif
 
     private let portal: Portal
+
+    /// Unique identifier for this rendered instance. Injected into the initial context as `instanceId`.
+    @objc public let instanceId = UUID().uuidString
     private var liveUpdatePath: URL?
 
     /// Creates an instance of ``PortalUIView``
@@ -252,7 +255,7 @@ public class PortalUIView: UIView {
     private func loadInitialContext(_ userContentViewController: WKUserContentController) {
         let portalInitialContext: String
 
-        var initialContext: [String: Any] = ["name": portal.name]
+        var initialContext: [String: Any] = ["name": portal.name, "instanceId": instanceId]
 
         if portal.initialContext.isNotEmpty {
             initialContext["value"] = portal.initialContext
@@ -268,7 +271,7 @@ public class PortalUIView: UIView {
            let jsonString = String(data: jsonData, encoding: .utf8) {
             portalInitialContext = jsonString
         } else {
-            portalInitialContext = #"{ "name": "\#(portal.name)" }"#
+            portalInitialContext = #"{ "name": "\#(portal.name)", "instanceId": "\#(instanceId)" }"#
         }
 
         let scriptSource = "window.portalInitialContext = " + portalInitialContext
